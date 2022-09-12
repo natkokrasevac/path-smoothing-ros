@@ -38,9 +38,8 @@
 #ifndef PATH_SMOOTHING_ROS_CUBIC_SPLINE_INTERPOLATOR_H
 #define PATH_SMOOTHING_ROS_CUBIC_SPLINE_INTERPOLATOR_H
 
-#include <ros/ros.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <nav_msgs/Path.h>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/path.hpp>
 
 namespace path_smoothing
 {
@@ -55,53 +54,52 @@ namespace path_smoothing
         bool useEndConditions = true,
         bool useMiddleConditions = false);
 
-      CubicSplineInterpolator(std::string name);
 
       ~CubicSplineInterpolator();
 
       void interpolatePath(
-        const nav_msgs::Path& path, nav_msgs::Path& smoothedPath);
+        const nav_msgs::msg::Path& path, nav_msgs::msg::Path& smoothedPath);
 
       void interpolatePath(
-        const std::vector<geometry_msgs::PoseStamped>& path,
-        std::vector<geometry_msgs::PoseStamped>& smoothedPath);
+        const std::vector<geometry_msgs::msg::PoseStamped>& path,
+        std::vector<geometry_msgs::msg::PoseStamped>& smoothedPath);
 
       void interpolatePoint(
-        const std::vector<geometry_msgs::PoseStamped>& path,
+        const std::vector<geometry_msgs::msg::PoseStamped>& path,
         const std::vector<double>& cummulativeDistances,
-        geometry_msgs::PoseStamped& point,
+        geometry_msgs::msg::PoseStamped& point,
         double pointCummDist);
 
       void calcCummulativeDistances(
-        const std::vector<geometry_msgs::PoseStamped> path,
+        const std::vector<geometry_msgs::msg::PoseStamped> path,
         std::vector<double>& cummulativeDistances);
 
-      double calcTotalDistance(const std::vector<geometry_msgs::PoseStamped>& path);
+      double calcTotalDistance(const std::vector<geometry_msgs::msg::PoseStamped>& path);
 
       double calcDistance(
-        const std::vector<geometry_msgs::PoseStamped>& path,
+        const std::vector<geometry_msgs::msg::PoseStamped>& path,
         unsigned int idx);
 
       double calcAlphaCoeff(
-        const std::vector<geometry_msgs::PoseStamped> path,
+        const std::vector<geometry_msgs::msg::PoseStamped> path,
         const std::vector<double> cummulativeDistances,
         unsigned int idx,
         double input);
 
       double calcBetaCoeff(
-        const std::vector<geometry_msgs::PoseStamped> path,
+        const std::vector<geometry_msgs::msg::PoseStamped> path,
         const std::vector<double> cummulativeDistances,
         unsigned int idx,
         double input);
 
       double calcGammaCoeff(
-        const std::vector<geometry_msgs::PoseStamped> path,
+        const std::vector<geometry_msgs::msg::PoseStamped> path,
         const std::vector<double> cummulativeDistances,
         unsigned int idx,
         double input);
 
       double calcDeltaCoeff(
-        const std::vector<geometry_msgs::PoseStamped> path,
+        const std::vector<geometry_msgs::msg::PoseStamped> path,
         const std::vector<double> cummulativeDistances,
         unsigned int idx,
         double input);
@@ -112,7 +110,7 @@ namespace path_smoothing
         double input);
 
       void calcPointGradient(
-        const std::vector<geometry_msgs::PoseStamped>& path,
+        const std::vector<geometry_msgs::msg::PoseStamped>& path,
         const std::vector<double>& cummulativeDistances,
         unsigned int idx, std::vector<double>& gradient);
 

@@ -36,10 +36,19 @@
 *********************************************************************/
 
 #include "path_smoothing_ros/cubic_spline_interpolator.h"
-#include <tf/tf.h>
-
+#include <tf2/convert.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2/utils.h>
 namespace path_smoothing
 {
+
+  auto createQuaternionMsgFromYaw(double yaw)
+  {
+    tf2::Quaternion q;
+    q.setRPY(0, 0, yaw);
+    return tf2::toMsg(q);
+  };
 
   CubicSplineInterpolator::CubicSplineInterpolator(
     double pointsPerUnit,
@@ -54,19 +63,6 @@ namespace path_smoothing
   {
   }
 
-  CubicSplineInterpolator::CubicSplineInterpolator(std::string name)
-  {
-    ros::NodeHandle pnh("~/" + name);
-
-    pnh.param("points_per_unit", pointsPerUnit_, 5.0);
-    pnh.param<bool>("use_end_conditions", useEndConditions_, false);
-    pnh.param<bool>("use_middle_conditions", useMiddleConditions_, false);
-
-    int skipPoints;
-    pnh.param("skip_points", skipPoints, 0);
-    skipPoints_ = abs(skipPoints);
-  }
-
 
   CubicSplineInterpolator::~CubicSplineInterpolator()
   {
@@ -74,8 +70,8 @@ namespace path_smoothing
 
 
   void CubicSplineInterpolator::interpolatePath(
-    const nav_msgs::Path& path,
-    nav_msgs::Path& smoothedPath)
+    const nav_msgs::msg::Path& path,
+    nav_msgs::msg::Path& smoothedPath)
   {
     smoothedPath.header = path.header;
     interpolatePath(path.poses, smoothedPath.poses);
@@ -83,8 +79,8 @@ namespace path_smoothing
 
 
   void CubicSplineInterpolator::interpolatePath(
-    const std::vector<geometry_msgs::PoseStamped>& path,
-    std::vector<geometry_msgs::PoseStamped>& smoothedPath)
+    const std::vector<geometry_msgs::msg::PoseStamped>& path,
+    std::vector<geometry_msgs::msg::PoseStamped>& smoothedPath)
   {
     // clear new smoothed path vector in case it's not empty
     smoothedPath.clear();
@@ -98,7 +94,7 @@ namespace path_smoothing
     calcCummulativeDistances(path, cummulativeDistances);
 
     // create temp pose
-    geometry_msgs::PoseStamped pose;
+    geometry_msgs::msg::PoseStamped pose;
     pose.header = path[0].header;
 
     unsigned int numPoints = pointsPerUnit_ * calcTotalDistance(path);
@@ -126,7 +122,7 @@ namespace path_smoothing
       double dx = smoothedPath[i+1].pose.position.x - smoothedPath[i].pose.position.x;
       double dy = smoothedPath[i+1].pose.position.y - smoothedPath[i].pose.position.y;
       double th = atan2(dy, dx);
-      smoothedPath[i].pose.orientation = tf::createQuaternionMsgFromYaw(th);
+      smoothedPath[i].pose.orientation = createQuaternionMsgFromYaw(th);
     }
 
     // revert skipPoints to original value
@@ -135,9 +131,9 @@ namespace path_smoothing
 
 
   void CubicSplineInterpolator::interpolatePoint(
-    const std::vector<geometry_msgs::PoseStamped>& path,
+    const std::vector<geometry_msgs::msg::PoseStamped>& path,
     const std::vector<double>& cummulativeDistances,
-    geometry_msgs::PoseStamped& point,
+    geometry_msgs::msg::PoseStamped& point,
     double pointCummDist)
   {
     unsigned int group = findGroup(cummulativeDistances, pointCummDist);
@@ -167,7 +163,7 @@ namespace path_smoothing
 
 
   void CubicSplineInterpolator::calcCummulativeDistances(
-    const std::vector<geometry_msgs::PoseStamped> path,
+    const std::vector<geometry_msgs::msg::PoseStamped> path,
     std::vector<double>& cummulativeDistances)
   {
     cummulativeDistances.clear();
@@ -181,7 +177,7 @@ namespace path_smoothing
 
 
   double CubicSplineInterpolator::calcTotalDistance(
-    const std::vector<geometry_msgs::PoseStamped>& path)
+    const std::vector<geometry_msgs::msg::PoseStamped>& path)
   {
     double totalDist = 0;
 
@@ -193,7 +189,7 @@ namespace path_smoothing
 
 
   double CubicSplineInterpolator::calcDistance(
-    const std::vector<geometry_msgs::PoseStamped>& path,
+    const std::vector<geometry_msgs::msg::PoseStamped>& path,
     unsigned int idx)
   {
     if (idx <= 0 || idx >=path.size())
@@ -209,7 +205,7 @@ namespace path_smoothing
 
 
   double CubicSplineInterpolator::calcAlphaCoeff(
-    const std::vector<geometry_msgs::PoseStamped> path,
+    const std::vector<geometry_msgs::msg::PoseStamped> path,
     const std::vector<double> cummulativeDistances,
     unsigned int idx,
     double input)
@@ -224,7 +220,7 @@ namespace path_smoothing
 
 
   double CubicSplineInterpolator::calcBetaCoeff(
-    const std::vector<geometry_msgs::PoseStamped> path,
+    const std::vector<geometry_msgs::msg::PoseStamped> path,
     const std::vector<double> cummulativeDistances,
     unsigned int idx,
     double input)
@@ -238,7 +234,7 @@ namespace path_smoothing
 
 
   double CubicSplineInterpolator::calcGammaCoeff(
-    const std::vector<geometry_msgs::PoseStamped> path,
+    const std::vector<geometry_msgs::msg::PoseStamped> path,
     const std::vector<double> cummulativeDistances,
     unsigned int idx,
     double input)
@@ -255,7 +251,7 @@ namespace path_smoothing
 
 
   double CubicSplineInterpolator::calcDeltaCoeff(
-    const std::vector<geometry_msgs::PoseStamped> path,
+    const std::vector<geometry_msgs::msg::PoseStamped> path,
     const std::vector<double> cummulativeDistances,
     unsigned int idx,
     double input)
@@ -282,7 +278,7 @@ namespace path_smoothing
 
 
   void CubicSplineInterpolator::calcPointGradient(
-    const std::vector<geometry_msgs::PoseStamped>& path,
+    const std::vector<geometry_msgs::msg::PoseStamped>& path,
     const std::vector<double>& cummulativeDistances,
     unsigned int idx,
     std::vector<double>& gradient)
@@ -294,7 +290,7 @@ namespace path_smoothing
     if ((useEndConditions_ && (idx == 0 || idx == cummulativeDistances.size()-1))
       || useMiddleConditions_)
     {
-      double th = tf::getYaw(path[idx*(skipPoints_+1)].pose.orientation);
+      double th = tf2::getYaw(path[idx*(skipPoints_+1)].pose.orientation);
       int sign = (fabs(th) < M_PI / 2) ? 1 : -1;
 
       gradient[0] = sign * calcTotalDistance(path)

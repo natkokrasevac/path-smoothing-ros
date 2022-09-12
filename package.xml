@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package format="2">
+<package format="3">
   <name>path_smoothing_ros</name>
   <version>0.0.0</version>
   <description>The path_smoothing_ros package</description>
@@ -11,12 +11,13 @@
   <author email="gkourosg@yahoo.gr">George Kouros</author>
 
 
-  <buildtool_depend>catkin</buildtool_depend>
-
-  <depend>roscpp</depend>
-  <depend>geometry_msgs</depend>
-  <depend>nav_msgs</depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
   <export>
+    <build_type>ament_cmake</build_type>
+    <depend>rclcpp</depend>
+    <depend>std_msgs</depend>
+    <depend>geometry_msgs</depend>
+    <depend>nav_msgs</depend>
   </export>
 </package>

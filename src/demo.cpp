@@ -2,7 +2,7 @@
 *
 * Software License Agreement (BSD License)
 *
-*  Copyright (c) 2016, George Kouros.
+*  Copyright (c) 2016, George Kourclcpp.
 *  All rights reserved.
 *
 *  Redistribution and use in source and binary forms, with or without
@@ -32,67 +32,89 @@
 *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 *  POSSIBILITY OF SUCH DAMAGE.
 *
-* Author:  George Kouros
+* Author:  George Kourclcpp
 *********************************************************************/
 
+#include "rclcpp/rclcpp.hpp"
 #include "path_smoothing_ros/cubic_spline_interpolator.h"
-#include <tf/tf.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/convert.h>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
-int main(int argc, char** argv)
+auto createQuaternionMsgFromYaw(double yaw)
 {
-  ros::init(argc, argv, "path_smoothing_ros_demo");
-  ros::NodeHandle nh("~");
-  ROS_INFO_STREAM("Namespace:" << nh.getNamespace());
+  tf2::Quaternion q;
+  q.setRPY(0, 0, yaw);
+  return tf2::toMsg(q);
+};
 
-  ros::Publisher initialPosePub = nh.advertise<geometry_msgs::PoseStamped>("initial_pose", 1, true);
-  ros::Publisher finalPosePub = nh.advertise<geometry_msgs::PoseStamped>("final_pose", 1, true);
-  ros::Publisher pathPub = nh.advertise<nav_msgs::Path>("initial_path", 1, true);
-  ros::Publisher smoothedPathPub = nh.advertise<nav_msgs::Path>("smoothed_path", 1, true);
+class PathSmoothingDemo : public rclcpp::Node
+{
+  public:
+    PathSmoothingDemo(): Node("path_smoothing_demo_node")
+    {
+      initialPosePub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/initial_pose", 1);
+      finalPosePub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/final_pose", 1);
+      pathPub = this->create_publisher<nav_msgs::msg::Path>("/initial_path", 1);
+      smoothedPathPub = this->create_publisher<nav_msgs::msg::Path>("/smoothed_path", 1);
 
-  int pointsPerUnit, skipPoints;
-  bool useEndConditions, useMiddleConditions;
+      pointsPerUnit = this->declare_parameter<int>("points_per_unit", 5);
+      skipPoints = this->declare_parameter<int>("skip_points", 0);
+      useEndConditions = this->declare_parameter<bool>("use_end_conditions", false);
+      useMiddleConditions = this->declare_parameter<bool>("use_middle_conditions", true);
+      smoothPath();
+    }
 
-  nh.param<int>("points_per_unit", pointsPerUnit, 5);
-  nh.param<int>("skip_points", skipPoints, 0);
-  nh.param<bool>("use_end_conditions", useEndConditions, false);
-  nh.param<bool>("use_middle_conditions", useMiddleConditions, false);
+  private:
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr initialPosePub;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr finalPosePub;
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pathPub;
+    rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr smoothedPathPub;
 
-  XmlRpc::XmlRpcValue poseList;
-  if (!nh.getParam("path_poses", poseList))
+    int pointsPerUnit, skipPoints;
+    bool useEndConditions, useMiddleConditions;
+
+  void smoothPath()
   {
-    ROS_FATAL("Failed to load path point list");
-    exit(EXIT_FAILURE);
+
+    std::vector<std::map<std::string, double>> poseList;
+    poseList.push_back({{"x", 0.0}, {"y", 0.0}, {"yaw", 0}});
+    poseList.push_back({{"x", 4.0}, {"y", 4.0}, {"yaw", 90}});
+
+    nav_msgs::msg::Path path, smoothedPath;
+    path.header.frame_id = "map";
+    geometry_msgs::msg::PoseStamped pose;
+    pose.header.frame_id = "map";
+
+    for (int i = 0; i < poseList.size(); i++)
+    {
+      pose.pose.position.x = static_cast<double>(poseList[i]["x"]);
+      pose.pose.position.y = static_cast<double>(poseList[i]["y"]);
+      pose.pose.orientation = createQuaternionMsgFromYaw(poseList[i]["yaw"]);
+      path.poses.push_back(pose);
+    }
+
+    // create a cubic spline interpolator
+    path_smoothing::CubicSplineInterpolator csi(pointsPerUnit, skipPoints, useEndConditions, useMiddleConditions);
+    csi.interpolatePath(path, smoothedPath);
+    initialPosePub->publish(path.poses.front());
+    finalPosePub->publish(path.poses.back());
+    pathPub->publish(path);
+    smoothedPathPub->publish(smoothedPath);
+    initialPosePub->publish(path.poses.at(0));
+    finalPosePub->publish(path.poses.at(path.poses.size() - 1));
   }
+};
 
-  nav_msgs::Path path, smoothedPath;
-  path.header.frame_id = "map";
-  geometry_msgs::PoseStamped pose;
-  pose.header.frame_id = "map";
 
-  for (int i = 0; i < poseList.size(); i++)
-  {
-    pose.pose.position.x = static_cast<double>(poseList[i]["x"]);
-    pose.pose.position.y = static_cast<double>(poseList[i]["y"]);
-    pose.pose.orientation = tf::createQuaternionMsgFromYaw(poseList[i]["yaw"]);
-    path.poses.push_back(pose);
-  }
-
-  // create a cubic spline interpolator
-  path_smoothing::CubicSplineInterpolator csi("lala");
-    // pointsPerUnit, skipPoints, useEndConditions, useMiddleConditions);
-  csi.interpolatePath(path, smoothedPath);
-
-  initialPosePub.publish(path.poses.front());
-  finalPosePub.publish(path.poses.back());
-  pathPub.publish(path);
-  smoothedPathPub.publish(smoothedPath);
-
-  ros::Time currTime = ros::Time::now();
-
-  while (ros::ok() && ros::Time::now().toSec() - currTime.toSec() < 2.0)
-  {
-    ros::spinOnce();
-  }
-
+int main(int argc, char * argv[])
+{
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<PathSmoothingDemo>());
+  rclcpp::shutdown();
   return 0;
 }
+
+
